@@ -8,33 +8,6 @@ parameters:
   displayName: Application Name
   required: true
   value: report-backend
-- name: GIT_SOURCE_URL
-  description: The source URL for the application
-  displayName: Source URL
-  required: true
-  value: https://github.com/adessoSchweiz/report-backend
-- name: PROJECT_NAME
-  description: The name of the project and the WAR file
-  displayName: Project Name
-  required: true
-  value: report-backend
-- name: GIT_SOURCE_REF
-  description: The source Ref for the application
-  displayName: Source Ref
-  required: true
-  value: master
-- description: Github trigger secret.  A difficult to guess string encoded as part of the webhook URL.  Not encrypted.
-  displayName: GitHub Webhook Secret
-  from: '[a-zA-Z0-9]{40}'
-  generate: expression
-  name: GITHUB_WEBHOOK_SECRET
-  required: true
-- description: A secret string used to configure the Generic webhook.
-  displayName: Generic Webhook Secret
-  from: '[a-zA-Z0-9]{40}'
-  generate: expression
-  name: GENERIC_WEBHOOK_SECRET
-  required: true
 objects:
 - apiVersion: v1
   kind: ImageStream
@@ -51,27 +24,17 @@ objects:
     name: wildfly
   spec:
     tags:
-    - annotations:
-        supports: wildfly:10.1.0.Final,jee,java
-        tags: builder,wildfly,java
-        version: "10.1.0.Final"
+    - name: "10.1.0.Final"
       from:
         kind: DockerImage
         name: jboss/wildfly:10.1.0.Final
-      name: "10.1.0.Final"
-    - annotations:
-        supports: jee,java
-        tags: builder,wildfly,java
+    - name: latest
       from:
         kind: ImageStreamTag
         name: "10.1.0.Final"
-      name: latest
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    annotations:
-      pipeline.alpha.openshift.io/uses: '[{"name": "${NAME}", "namespace": "", "kind": "DeploymentConfig"}]'
-    creationTimestamp: null
     labels:
       name: ${APP_NAME}
     name: ${APP_NAME}
@@ -92,11 +55,11 @@ objects:
 
                 node("maven") {
                   stage("Checkout") {
-                    git url: "${GIT_SOURCE_URL}", branch: "${GIT_SOURCE_REF}"
+                    git url: "https://github.com/adessoSchweiz/${APP_NAME}", branch: "master"
                   }
                   stage("Build WAR") {
                     sh "mvn clean package"
-                    sh "mv target/${PROJECT_NAME}.war target/ROOT.war"
+                    sh "mv target/${APP_NAME}.war target/ROOT.war"
                     stash name:"war", includes:"target/ROOT.war"
                   }
                 }
@@ -119,13 +82,6 @@ objects:
              throw err
           }
       type: JenkinsPipeline
-    triggers:
-    - github:
-        secret: "${GITHUB_WEBHOOK_SECRET}"
-      type: GitHub
-    - generic:
-        secret: "${GENERIC_WEBHOOK_SECRET}"
-      type: Generic
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -216,8 +172,6 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
-    annotations:
-      openshift.io/generated-by: OpenShiftNewApp
     labels:
       app: ${APP_NAME}
     name: ${APP_NAME}
